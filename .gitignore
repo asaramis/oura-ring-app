@@ -1,3 +1,6 @@
 .env
 .netlify
 node_modules
+oura_data/
+apple_health_data/
+withings_data/

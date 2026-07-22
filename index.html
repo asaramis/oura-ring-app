@@ -153,6 +153,129 @@
                 min-width: 0;
             }
         }
+        .chat-section {
+            margin-top: 30px;
+            background: #1a1a1a;
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .chat-header {
+            font-size: 1.1rem;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+        .chat-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+        .chat-message {
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            max-width: 85%;
+        }
+        .chat-message.user {
+            background: #3b82f6;
+            color: white;
+            margin-left: auto;
+        }
+        .chat-message.assistant {
+            background: #2a2a2a;
+            color: #e0e0e0;
+        }
+        .chat-message.assistant p {
+            margin: 0 0 8px 0;
+        }
+        .chat-message.assistant p:last-child {
+            margin-bottom: 0;
+        }
+        .chat-input-container {
+            display: flex;
+            gap: 12px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 1px solid #333;
+            border-radius: 12px;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            font-size: 1rem;
+            outline: none;
+        }
+        .chat-input:focus {
+            border-color: #3b82f6;
+        }
+        .chat-input::placeholder {
+            color: #666;
+        }
+        .chat-send {
+            padding: 14px 24px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .chat-send:hover {
+            background: #2563eb;
+        }
+        .chat-send:disabled {
+            background: #374151;
+            cursor: not-allowed;
+        }
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #666;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-4px); }
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 30px 0 16px;
+        }
+        .section-header h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #ccc;
+        }
+        .section-meta {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .score-value.steps { color: #38bdf8; }
+        .score-value.apple-sleep { color: #a78bfa; }
+        .score-value.resting-hr { color: #f87171; }
+        .empty-state {
+            background: #1a1a1a;
+            border-radius: 16px;
+            padding: 24px;
+            color: #888;
+            line-height: 1.6;
+        }
+        .empty-state code {
+            background: #0f0f0f;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #ccc;
+        }
     </style>
 </head>
 <body>
@@ -165,13 +288,17 @@
         </header>
 
         <div id="authScreen" class="auth-screen">
-            <h2>Connect Your Oura Ring</h2>
-            <p>Link your Oura account to see your sleep, readiness, and activity data in one place.</p>
+            <h2>Health Dashboard</h2>
+            <p>Connect your Oura Ring to see sleep, readiness, and activity scores. Apple Health data appears automatically once you set up Health Auto Export.</p>
             <button class="connect-btn" onclick="connectOura()">Connect Oura Ring</button>
         </div>
 
         <div id="dashboard" class="hidden">
-            <div class="scores-grid">
+            <div id="ouraSection">
+                <div class="section-header">
+                    <h2>Oura Ring</h2>
+                </div>
+                <div class="scores-grid">
                 <div class="score-card">
                     <div class="score-label">Sleep Score</div>
                     <div class="score-value sleep" id="sleepScore">--</div>
@@ -194,7 +321,52 @@
                 </div>
             </div>
 
-            <div class="charts-grid">
+            <div id="appleHealthSection" class="hidden">
+                <div class="section-header">
+                    <h2>Apple Health</h2>
+                    <div class="section-meta" id="appleHealthMeta">Waiting for sync</div>
+                </div>
+                <div class="scores-grid">
+                    <div class="score-card">
+                        <div class="score-label">Steps</div>
+                        <div class="score-value steps" id="appleSteps">--</div>
+                        <div class="score-subtitle" id="appleStepsDate">--</div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-label">Sleep</div>
+                        <div class="score-value apple-sleep" id="appleSleep">--</div>
+                        <div class="score-subtitle" id="appleSleepDetail">-- hrs</div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-label">Resting HR</div>
+                        <div class="score-value resting-hr" id="appleRestingHr">--</div>
+                        <div class="score-subtitle">bpm</div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-label">Active Energy</div>
+                        <div class="score-value activity" id="appleActiveEnergy">--</div>
+                        <div class="score-subtitle">kcal</div>
+                    </div>
+                </div>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">Steps (30 days)</div>
+                        <div class="chart-container">
+                            <canvas id="appleStepsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="appleHealthSetup" class="empty-state hidden">
+                <strong>Apple Health not synced yet.</strong><br><br>
+                In Health Auto Export, create a REST API automation pointing to
+                <code>https://oura-ring-app.netlify.app/api/apple-health-sync</code>
+                with an <code>Authorization: Bearer ...</code> header matching your Netlify
+                <code>APPLE_HEALTH_SYNC_TOKEN</code>, then run a manual export to test.
+            </div>
+
+            <div class="charts-grid" id="ouraCharts">
                 <div class="chart-card">
                     <div class="chart-title">Sleep Score (30 days)</div>
                     <div class="chart-container">
@@ -220,6 +392,16 @@
                     </div>
                 </div>
             </div>
+            </div>
+
+            <div class="chat-section">
+                <div class="chat-header">Ask about your health data</div>
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="e.g., How was my sleep this week?" />
+                    <button class="chat-send" id="chatSend" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -240,6 +422,71 @@
             window.location.reload();
         }
 
+        async function fetchAppleHealthData() {
+            try {
+                const response = await fetch('/api/apple-health-data');
+                if (!response.ok) return null;
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching Apple Health data:', error);
+                return null;
+            }
+        }
+
+        function formatAppleDate(dateStr) {
+            if (!dateStr) return '--';
+            const date = new Date(dateStr);
+            if (Number.isNaN(date.getTime())) return dateStr;
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function loadAppleHealthDashboard(data) {
+            document.getElementById('appleHealthSection').classList.remove('hidden');
+            document.getElementById('appleHealthSetup').classList.add('hidden');
+
+            if (data.lastUpdated) {
+                document.getElementById('appleHealthMeta').textContent =
+                    `Last sync ${new Date(data.lastUpdated).toLocaleString()}`;
+            }
+
+            const summary = data.summary || {};
+
+            if (summary.steps) {
+                document.getElementById('appleSteps').textContent =
+                    Math.round(summary.steps.value ?? 0).toLocaleString();
+                document.getElementById('appleStepsDate').textContent =
+                    formatAppleDate(summary.steps.date);
+            }
+
+            if (summary.sleep) {
+                document.getElementById('appleSleep').textContent =
+                    summary.sleep.totalSleep != null ? summary.sleep.totalSleep.toFixed(1) : '--';
+                const parts = [];
+                if (summary.sleep.deep != null) parts.push(`deep ${summary.sleep.deep.toFixed(1)}h`);
+                if (summary.sleep.rem != null) parts.push(`rem ${summary.sleep.rem.toFixed(1)}h`);
+                document.getElementById('appleSleepDetail').textContent =
+                    parts.length ? parts.join(' · ') : 'hrs';
+            }
+
+            if (summary.restingHeartRate) {
+                document.getElementById('appleRestingHr').textContent =
+                    Math.round(summary.restingHeartRate.value ?? 0);
+            }
+
+            if (summary.activeEnergy) {
+                document.getElementById('appleActiveEnergy').textContent =
+                    Math.round(summary.activeEnergy.value ?? 0).toLocaleString();
+            }
+
+            const stepSeries = data.metrics?.step_count?.data || [];
+            if (stepSeries.length) {
+                createChart('appleStepsChart', 'Steps', {
+                    labels: stepSeries.map((point) => formatAppleDate(point.date)),
+                    values: stepSeries.map((point) => point.qty ?? point.Avg ?? point.avg ?? 0)
+                }, '#38bdf8', false);
+            }
+        }
+
         async function fetchOuraData(endpoint) {
             const token = getToken();
             if (!token) return null;
@@ -257,7 +504,7 @@
             }
         }
 
-        function createChart(canvasId, label, data, color) {
+        function createChart(canvasId, label, data, color, capAt100 = true) {
             const ctx = document.getElementById(canvasId).getContext('2d');
 
             if (charts[canvasId]) {
@@ -294,7 +541,7 @@
                             grid: { color: '#2a2a2a' },
                             ticks: { color: '#666' },
                             min: 0,
-                            max: label === 'HRV' ? undefined : 100
+                            max: capAt100 && label !== 'HRV' && label !== 'Steps' ? 100 : undefined
                         }
                     }
                 }
@@ -307,7 +554,22 @@
         }
 
         async function loadDashboard() {
-            // Fetch all data in parallel
+            const token = getToken();
+            const appleHealth = await fetchAppleHealthData();
+
+            if (appleHealth?.hasData) {
+                loadAppleHealthDashboard(appleHealth);
+            } else {
+                document.getElementById('appleHealthSetup').classList.remove('hidden');
+            }
+
+            if (!token) {
+                document.getElementById('ouraSection').classList.add('hidden');
+                document.getElementById('ouraCharts').classList.add('hidden');
+                return;
+            }
+
+            // Fetch all Oura data in parallel
             const [sleepData, readinessData, activityData] = await Promise.all([
                 fetchOuraData('daily_sleep'),
                 fetchOuraData('daily_readiness'),
@@ -374,18 +636,102 @@
             }
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            const token = getToken();
+        function addMessage(content, role) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${role}`;
+            messageDiv.innerHTML = content.replace(/\n/g, '<br>');
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
 
-            if (token) {
+        function showTypingIndicator() {
+            const messagesContainer = document.getElementById('chatMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'chat-message assistant typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = '<span></span><span></span><span></span>';
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const sendBtn = document.getElementById('chatSend');
+            const question = input.value.trim();
+
+            if (!question) return;
+
+            const token = getToken();
+            const appleHealth = await fetchAppleHealthData();
+
+            if (!token && !appleHealth?.hasData) {
+                addMessage('Connect Oura or sync Apple Health before asking questions.', 'assistant');
+                return;
+            }
+
+            // Add user message
+            addMessage(question, 'user');
+            input.value = '';
+            sendBtn.disabled = true;
+            showTypingIndicator();
+
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+                hideTypingIndicator();
+
+                if (data.error) {
+                    addMessage('Sorry, I encountered an error: ' + data.error, 'assistant');
+                } else {
+                    addMessage(data.answer, 'assistant');
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                addMessage('Sorry, something went wrong. Please try again.', 'assistant');
+            }
+
+            sendBtn.disabled = false;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = getToken();
+            const appleHealth = await fetchAppleHealthData();
+            const hasAppleHealth = Boolean(appleHealth?.hasData);
+
+            if (token || hasAppleHealth) {
                 document.getElementById('authScreen').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
+            }
+
+            if (token) {
                 document.getElementById('connectBtn').textContent = 'Disconnect';
                 document.getElementById('connectBtn').className = 'disconnect-btn';
                 document.getElementById('connectBtn').onclick = disconnect;
-                loadDashboard();
             }
+
+            if (token || hasAppleHealth) {
+                await loadDashboard();
+            }
+
+            // Enter key to send message
+            document.getElementById('chatInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
         });
     </script>
 </body>
