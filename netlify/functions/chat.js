@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { connectLambda } from '@netlify/blobs';
 import { getAppleHealthContext } from './lib/apple-health-storage.js';
 
 const anthropic = new Anthropic({
@@ -18,38 +17,34 @@ async function fetchOuraData(token, endpoint, startDate, endDate) {
   return response.json();
 }
 
-export const handler = async (event) => {
-  connectLambda(event);
-
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
+export default async (request) => {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Access-Control-Allow-Methods': 'POST, OPTIONS'
       }
-    };
+    });
   }
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
+  if (request.method !== 'POST') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = request.headers.get('authorization');
   const ouraToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-  const { question } = JSON.parse(event.body || '{}');
+
+  let question;
+  try {
+    ({ question } = await request.json());
+  } catch {
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
 
   if (!question) {
-    return {
-      statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'No question provided' })
-    };
+    return Response.json({ error: 'No question provided' }, { status: 400 });
   }
 
   try {
@@ -74,13 +69,10 @@ export const handler = async (event) => {
     );
 
     if (!hasOuraData && !appleHealth) {
-      return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          error: 'No health data available. Connect Oura or sync Apple Health first.'
-        })
-      };
+      return Response.json(
+        { error: 'No health data available. Connect Oura or sync Apple Health first.' },
+        { status: 400 }
+      );
     }
 
     const systemPrompt = `You are a helpful health data assistant analyzing personal health data from Oura Ring and/or Apple Health.
@@ -121,20 +113,12 @@ When discussing Apple Health metrics, use the units provided in the data. Refere
       ]
     });
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({ answer: response.content[0].text })
-    };
+    return Response.json(
+      { answer: response.content[0].text },
+      { headers: { 'Access-Control-Allow-Origin': '*' } }
+    );
   } catch (error) {
     console.error('Chat error:', error);
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: error.message })
-    };
+    return Response.json({ error: error.message }, { status: 500 });
   }
 };

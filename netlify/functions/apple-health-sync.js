@@ -1,99 +1,65 @@
-import { connectLambda } from '@netlify/blobs';
-import { saveIncomingPayload } from './lib/apple-health-storage.js';
+import { loadStoredData, saveIncomingPayload } from './lib/apple-health-storage.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-function unauthorized() {
-  return {
-    statusCode: 401,
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ error: 'Unauthorized' })
-  };
+function jsonResponse(body, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...JSON_HEADERS, ...extraHeaders }
+  });
 }
 
-function parseBody(event) {
-  if (!event.body) return null;
-
-  const raw = event.isBase64Encoded
-    ? Buffer.from(event.body, 'base64').toString('utf8')
-    : event.body;
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+function getRequestHeaders(request) {
+  return Object.fromEntries(request.headers.entries());
 }
 
-function isAuthorized(event) {
+function isAuthorized(request) {
   const expected = process.env.APPLE_HEALTH_SYNC_TOKEN;
   if (!expected) return false;
 
-  const authHeader = event.headers.authorization || event.headers.Authorization || '';
+  const authHeader = request.headers.get('authorization') || '';
   return authHeader === `Bearer ${expected}`;
 }
 
-export const handler = async (event) => {
-  connectLambda(event);
-
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        ...JSON_HEADERS,
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      }
-    };
+export default async (request) => {
+  if (request.method === 'OPTIONS') {
+    return jsonResponse({}, 200, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    });
   }
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405);
   }
 
   if (!process.env.APPLE_HEALTH_SYNC_TOKEN) {
-    return {
-      statusCode: 503,
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ error: 'APPLE_HEALTH_SYNC_TOKEN is not configured' })
-    };
+    return jsonResponse({ error: 'APPLE_HEALTH_SYNC_TOKEN is not configured' }, 503);
   }
 
-  if (!isAuthorized(event)) {
-    return unauthorized();
+  if (!isAuthorized(request)) {
+    return jsonResponse({ error: 'Unauthorized' }, 401);
   }
 
-  const body = parseBody(event);
-  if (!body) {
-    return {
-      statusCode: 400,
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ error: 'Invalid JSON body' })
-    };
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON body' }, 400);
   }
 
   try {
-    const result = await saveIncomingPayload(body, event.headers);
+    const result = await saveIncomingPayload(body, getRequestHeaders(request));
+    const stored = await loadStoredData();
 
-    return {
-      statusCode: 200,
-      headers: JSON_HEADERS,
-      body: JSON.stringify({
-        ok: true,
-        ...result
-      })
-    };
+    return jsonResponse({
+      ok: true,
+      ...result,
+      verifiedMetrics: Object.keys(stored.metrics || {}).length
+    });
   } catch (error) {
     console.error('Apple Health sync error:', error);
-    return {
-      statusCode: 500,
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ error: error.message })
-    };
+    return jsonResponse({ error: error.message }, 500);
   }
 };

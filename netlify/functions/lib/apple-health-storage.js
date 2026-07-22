@@ -70,7 +70,10 @@ export function mergeWorkouts(existingWorkouts, incomingWorkouts) {
 
 export async function loadStoredData() {
   const store = getHealthStore();
-  const stored = await store.get(METRICS_KEY, { type: 'json' });
+  const stored = await store.get(METRICS_KEY, {
+    type: 'json',
+    consistency: 'strong'
+  });
 
   return stored || {
     lastUpdated: null,
@@ -95,7 +98,7 @@ export async function saveIncomingPayload(body, headers = {}) {
 
   await store.setJSON(METRICS_KEY, updated);
 
-  const syncLog = (await store.get(SYNC_LOG_KEY, { type: 'json' })) || [];
+  const syncLog = (await store.get(SYNC_LOG_KEY, { type: 'json', consistency: 'strong' })) || [];
   syncLog.unshift({
     receivedAt,
     sessionId: headers['session-id'] || headers['Session-Id'] || null,
@@ -153,7 +156,7 @@ export function buildSummary(stored) {
 
 export async function loadSyncLog() {
   const store = getHealthStore();
-  return (await store.get(SYNC_LOG_KEY, { type: 'json' })) || [];
+  return (await store.get(SYNC_LOG_KEY, { type: 'json', consistency: 'strong' })) || [];
 }
 
 export async function getAppleHealthContext() {
