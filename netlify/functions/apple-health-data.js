@@ -1,3 +1,4 @@
+import { connectLambda } from '@netlify/blobs';
 import { buildSummary, loadStoredData, loadSyncLog } from './lib/apple-health-storage.js';
 
 const JSON_HEADERS = {
@@ -6,6 +7,8 @@ const JSON_HEADERS = {
 };
 
 export const handler = async (event) => {
+  connectLambda(event);
+
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,

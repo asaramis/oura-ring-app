@@ -1,3 +1,4 @@
+import { connectLambda } from '@netlify/blobs';
 import { saveIncomingPayload } from './lib/apple-health-storage.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -33,6 +34,8 @@ function isAuthorized(event) {
 }
 
 export const handler = async (event) => {
+  connectLambda(event);
+
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,

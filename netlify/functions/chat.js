@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { connectLambda } from '@netlify/blobs';
 import { getAppleHealthContext } from './lib/apple-health-storage.js';
 
 const anthropic = new Anthropic({
@@ -18,6 +19,8 @@ async function fetchOuraData(token, endpoint, startDate, endDate) {
 }
 
 export const handler = async (event) => {
+  connectLambda(event);
+
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
